@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#00ffc8" />
+  <meta name="description" content="Smart Aid Control Panel for visually impaired assistance">
+  <!-- Security headers -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-src 'self' https://smartaid.ngrok.io;">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="Referrer-Policy" content="no-referrer-when-downgrade">
+  <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=()">
+  
+  <title>Smart Aid - Control Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  
+  <style>
+    /* Star particle effect */
+    #star-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .star {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      opacity: 0;
+      animation: twinkle 2s infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+    
+    /* PWA Styles */
+    :root {
+      --bg-dark: #0a0a0a;
+      --primary: #00ffc8;
+      --accent: #00ff99;
+      --card-bg: #1a1a1a;
+      --text-color: #e0e0e0;
+      --shadow: rgba(0, 255, 200, 0.3);
+    }
+
+    body {
+      font-family: 'Orbitron', sans-serif;
+      margin: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-color);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      overflow-x: auto;
+      padding: 10px;
+      background-color: #121212;
+      border-bottom: 2px solid var(--primary);
+      box-shadow: 0 2px 10px var(--shadow);
+      position: relative;
+      z-index: 10;
+    }
+
+    nav button {
+      flex: 1;
+      white-space: nowrap;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: bold;
+      background: transparent;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    nav button:hover {
+      background-color: var(--accent);
+      color: #000;
+    }
+
+    .section {
+      display: none;
+      padding: 20px;
+      animation: fadeIn 0.3s ease-in-out;
+      flex: 1;
+      overflow-y: auto;
+      position: relative;
+      z-index: 5;
+    }
+
+    .active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    button,
+    select,
+    input[type="text"],
+    input[type="range"] {
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+      border: none;
+      margin: 8px 0;
+      outline: none;
+    }
+
+    button {
+      background: var(--primary);
+      color: #000;
+      font-weight: bold;
+      box-shadow: 0 0 12px var(--shadow);
+    }
+
+    #map {
+      height: 50vh;
+      width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 0 10px var(--shadow);
+    }
+
+    .log-box,
+    .status-box {
+      background: var(--card-bg);
+      padding: 14px;
+      border-radius: 10px;
+      box-shadow: 0 0 6px var(--shadow);
+      margin-top: 12px;
+      position: relative;
+      z-index: 5;
+    }
+
+    #sensor-video img {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+    }
+
+    /* Floating microphone button */
+    .floating-mic {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--primary);
+      color: #000;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 26px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--shadow);
+      z-index: 1000;
+      transition: background 0.2s ease;
+    }
+
+    .floating-mic:hover {
+      background: var(--accent);
+      color: #000;
+    }
+    
+    /* PWA Install Button */
+    #installButton {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      background: var(--primary);
+      color: #000;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 26px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--shadow);
+      z-index: 1000;
+      display: none;
+    }
+    
+    /* Offline Notification */
+    #offlineNotification {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff3333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      z-index: 2000;
+      display: none;
+    }
+    
+    /* App Header */
+    .app-header {
+      display: flex;
+      align-items: center;
+      padding: 10px 20px;
+      background: #121212;
+      border-bottom: 1px solid var(--primary);
+      position: relative;
+      z-index: 10;
+      justify-content: space-between;
+    }
+    
+    .app-header-left {
+      display: flex;
+      align-items: center;
+    }
+    
+    .app-icon {
+      width: 40px;
+      height: 40px;
+      margin-right: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #000;
+    }
+    
+    .app-title {
+      flex: 1;
+      font-size: 1.2rem;
+    }
+    
+    .app-header-right {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .header-install-btn {
+      background: var(--primary);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 0 8px var(--shadow);
+    }
+    
+    .privacy-link {
+      color: var(--primary);
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    
+    .privacy-link:hover {
+      background: rgba(0, 255, 200, 0.1);
+    }
+    
+    /* Security badge */
+    .security-badge {
+      background: var(--primary);
+      color: #000;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-left: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      nav {
+        flex-wrap: wrap;
+      }
+      nav button {
+        flex: 1 0 33%;
+        font-size: 13px;
+        padding: 8px;
+      }
+      
+      .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 10px;
+      }
+      
+      .app-header-right {
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 8px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      nav button {
+        flex: 1 0 50%;
+      }
+      .section {
+        padding: 10px;
+      }
+      
+      .header-install-btn span {
+        display: none;
+      }
+      
+      .header-install-btn {
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Star background container -->
+  <div id="star-background"></div>
+  
+  <!-- App Header -->
+  <div class="app-header">
+    <div class="app-header-left">
+      <div class="app-icon">SA</div>
+      <div class="app-title">Smart Aid Control Panel <span class="security-badge">🔒 Secure</span></div>
+    </div>
+    
+    <div class="app-header-right">
+      <a href="/privacy" class="privacy-link">Privacy Policy</a>
+      <button id="headerInstallButton" class="header-install-btn" onclick="installPWA()">
+        <span>Install App</span> 📲
+      </button>
+    </div>
+  </div>
+
+  <!-- Offline Notification -->
+  <div id="offlineNotification">You are currently offline. Some features may be limited.</div>
+
+  <nav>
+    <button class="nav-btn" onclick="switchSection('dashboard', this);">📊 Dashboard</button>
+    <button class="nav-btn" onclick="switchSection('nav', this);">🗺️ Navigation</button>
+    <button class="nav-btn" onclick="switchSection('detect', this);">🎯 Detection</button>
+    <button class="nav-btn" onclick="switchSection('sensor', this);">📏 Sensors</button>
+    <button class="nav-btn" onclick="switchSection('system', this);">🧠 System</button>
+    <button class="nav-btn" onclick="switchSection('voice', this);">🔊 Voice</button>
+    <button onclick="shutdownPi(); speak('Shutting down the Raspberry Pi')">⚠️ Power Off</button>
+    <button onclick="deleteLogs()">🧹 Delete All Logs</button>
+  </nav>
+
+  <!-- Floating Buttons -->
+  <button class="floating-mic" onclick="startListening()">🎤</button>
+  <button id="installButton" onclick="installPWA()">📲</button>
+
+  <div id="dashboard" class="section active">
+    <h2>Welcome to Smart Hat Dashboard</h2>
+    <p>Use the tabs above to explore system features. This PWA application is securely hosted with encrypted connections.</p>
+
+    <div class="status-box">
+      Motion: <span id="motionStatus">--</span>
+    </div>
+
+    <div class="status-box" style="margin-top: 30px;">
+      <h3>📈 System Analytics</h3>
+      <div id="analytics-wrapper" style="position: relative;">
+        <div id="loading-spinner">
+          <span>🔄 Loading analytics...</span>
+        </div>
+        <div style="position:relative; padding-bottom:140%; height:0; overflow:hidden; border-radius:12px;">
+          <iframe 
+            src="https://smartaid.ngrok.io/analytics/" 
+            style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; border-radius:12px; background-color:#1a1a1a;" 
+            allowfullscreen
+            onload="document.getElementById('loading-spinner').style.display='none'">
+          </iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="nav" class="section">
+    <div id="map"></div>
+    <input type="text" id="destinationInput" placeholder="Search destination..." />
+    <button onclick="startVoiceSearch()">🎙 Voice</button>
+    <div class="status-box">
+      Distance: <span id="distanceTravelled">0</span> m<br />
+      Speed: <span id="speed">0</span> km/h
+    </div>
+  </div>
+
+  <div id="detect" class="section">
+    <h3>Detection Controls</h3>
+
+    <!-- Mute Toggle -->
+    <label><input type="checkbox" id="muteToggle" onchange="toggleMute()" /> 🔇 Mute Voice Output</label>
+    <br />
+
+    <!-- Mode Selection -->
+    <label for="modeSelect">Mode:</label>
+    <select id="modeSelect" onchange="updateMode()">
+      <option value="home">🏠 Home</option>
+      <option value="public">🌆 Public</option>
+      <option value="custom">🧩 Custom</option>
+    </select>
+    <br />
+
+    <!-- 🔘 Custom Mode Label Picker -->
+    <div id="customLabelBox" style="display:none; margin-top:10px;">
+      <strong>Select labels for Custom Mode:</strong><br />
+      <div id="customLabels" style="max-height:150px; overflow-y:auto; padding:6px; border:1px solid #ccc; border-radius:6px;"></div>
+    </div>
+
+    <!-- Config Controls -->
+    <button onclick="updateConfig(); speak('Object filter applied')">✅ Apply</button>
+    <button onclick="speakLastDetection()">🔊 Repeat Last Detection</button>
+    <button onclick="clearDetectionLog()">🗑️ Clear Log</button>
+
+    <!-- Detection Log -->
+    <div id="detectionLog" class="log-box">
+      <strong>Detections:</strong>
+      <ul id="detectionList"><li id="placeholder">No detections yet.</li></ul>
+    </div>
+
+    <!-- 🔍 Status Panel -->
+    <div id="statusPanel" class="status-box">
+      <p><strong>Current Mode:</strong> <span id="modeLabel">Loading...</span></p>
+      <p><strong>Active Labels:</strong> <span id="activeLabels">Loading...</span></p>
+
+      <label>
+        <input type="checkbox" id="toggleDetection"> ✅ Detection Active
+      </label><br />
+      <label>
+        <input type="checkbox" id="toggleVoice"> 🔊 Voice Alerts
+      </label>
+    </div>
+  </div>
+
+  <div id="sensor" class="section">
+    <h3>Ultrasonic Thresholds (cm)</h3>
+    <label>Left Front: <input type="range" id="Left Front" min="10" max="150" value="70" /></label><br />
+    <label>Left Middle: <input type="range" id="Left Middle" min="10" max="150" value="70" /></label><br />
+    <label>Left Rear: <input type="range" id="Left Rear" min="10" max="150" value="70" /></label><br />
+    <label>Right Front: <input type="range" id="Right Front" min="10" max="150" value="70" /></label><br />
+    <label>Right Middle: <input type="range" id="Right Middle" min="10" max="150" value="70" /></label><br />
+    <label>Right Rear: <input type="range" id="Right Rear" min="10" max="150" value="70" /></label><br />
+
+    <button onclick="applyThresholds()">💾 Save Thresholds</button>
+    <button onclick="toggleFullScreen(document.getElementById('liveVideo'))">🖥 Full Screen</button>
+
+    <div id="sensor-video" style="margin-top:20px;">
+      <h3>Live Video Feed</h3>
+      <img id="liveVideo" src="/video_feed" alt="Live Stream" style="width:100%; border-radius:10px; border:none;" />
+    </div>
+
+    <div class="status-box">
+      <a id="latestVideoLink" href="/latest_video" target="_blank" download>🎥 Download Latest Video</a>
+    </div>
+  </div>
+
+  <div id="system" class="section">
+    <h3>System Tools</h3>
+    
+    <label><input type="checkbox" id="indoorToggle" onchange="toggleIndoorMode()" /> Indoor Mode</label><br>
+    <label><input type="checkbox" id="quietToggle" onchange="toggleQuietMode()" /> Quiet Mode</label><br>
+    <label><input type="checkbox" id="wakeToggle" onchange="toggleWakeWord()" /> Wake Word</label><br>
+
+    <div class="log-box">
+      <strong>Device:</strong> <span id="deviceName">--</span><br>
+      <strong>Quiet:</strong> <span id="quietStatus">--</span><br>
+      <strong>Mode:</strong> <span id="currentMode">--</span>
+    </div>
+
+    <button onclick="checkStatus()">📊 Check Status</button>
+    <button onclick="toggleLog()">📄 Logs</button>
+
+    <div id="log" class="log-box" style="display:none">Loading...</div>
+
+    <!-- ✅ Wi-Fi Status Card -->
+    <div class="card p-3 rounded-xl shadow bg-white" style="margin-top: 20px;">
+      <h2 class="text-xl font-bold mb-2">📶 Wi-Fi Status</h2>
+      <p><strong>SSID:</strong> <span id="wifi-ssid">Loading...</span></p>
+      <p><strong>Signal:</strong> <span id="wifi-signal">Loading...</span></p>
+      <p><strong>IP Address:</strong> <span id="wifi-ip">Loading...</span></p>
+      <p><strong>Connection Quality:</strong> <span id="wifi-quality">Loading...</span></p>
+      <button onclick="refreshWifiStatus()" class="mt-2 px-4 py-1 bg-blue-500 text-white rounded">🔄 Refresh</button>
+    </div>
+    
+    <!-- Security Status -->
+    <div class="status-box" style="margin-top: 20px;">
+      <h3>🔒 Security Status</h3>
+      <p><strong>Connection:</strong> <span id="security-connection">Secure 🔒</span></p>
+      <p><strong>Data Encryption:</strong> <span id="security-encryption">Enabled</span></p>
+      <p><strong>Service Worker:</strong> <span id="security-sw">Active</span></p>
+      <p><strong>Privacy Controls:</strong> <span id="security-privacy">Enabled</span></p>
+    </div>
+  </div>
+
+  <div id="voice" class="section">
+    <h3>Custom Voice Command</h3>
+    <label for="voiceSelector">Voice:</label>
+    <select id="voiceSelector">
+      <option value="female">Female</option>
+      <option value="male">Male</option>
+    </select>
+    <br />
+    <input type="text" id="voiceInput" placeholder="Say something..." />
+    <button onclick="sendVoice()">📢 Speak</button>
+  </div>
+
+  <!-- External JS Files -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBY3Yq8fMunZyBiHqjalocVA1yKyLCi4nw&libraries=places&callback=initMap" async defer></script>
+
+  <!-- JS + Logic Order -->
+  <script>
+  // Star particle effect
+  const starCount = 200;
+  const starBackground = document.getElementById('star-background');
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.classList.add('star');
+
+    star.style.top = Math.random() * height + 'px';
+    star.style.left = Math.random() * width + 'px';
+
+    const size = Math.random() * 3 + 1;
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+
+    star.style.animationDelay = Math.random() * 5 + 's';
+
+    starBackground.appendChild(star);
+  }
+
+  // PWA Installation Logic
+  let deferredPrompt;
+  const installButton = document.getElementById('installButton');
+  const headerInstallButton = document.getElementById('headerInstallButton');
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later
+    deferredPrompt = e;
+    // Update UI to notify the user they can install the PWA
+    installButton.style.display = 'block';
+    headerInstallButton.style.display = 'flex';
+  });
+  
+  function installPWA() {
+    if (!deferredPrompt) {
+      speak("PWA installation not available in this browser");
+      return;
+    }
+    
+    // Show the install prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+        speak("Smart Aid is installing...");
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      // Clear the deferredPrompt so it can be garbage collected
+      deferredPrompt = null;
+      installButton.style.display = 'none';
+      headerInstallButton.style.display = 'none';
+    });
+  }
+  
+  // Detect when the app is successfully installed
+  window.addEventListener('appinstalled', () => {
+    console.log('PWA was installed');
+    installButton.style.display = 'none';
+    headerInstallButton.style.display = 'none';
+    speak("Smart Aid installed successfully! You can now use it like a native app.");
+  });
+  
+  // Offline Detection
+  window.addEventListener('online', () => {
+    document.getElementById('offlineNotification').style.display = 'none';
+    console.log('Online again');
+    speak("Back online. All features available.");
+  });
+  
+  window.addEventListener('offline', () => {
+    document.getElementById('offlineNotification').style.display = 'block';
+    console.log('Offline');
+    speak("You are offline. Some features may not work.");
+  });
+  
+  // Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(registration => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          speak("Service worker activated for offline use");
+          
+          // Check for updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  // New update available
+                  speak("New version available. Refresh to update.");
+                  const updateMsg = "A new version is available. Refresh now?";
+                  if (confirm(updateMsg)) {
+                    window.location.reload();
+                  }
+                }
+              }
+            });
+          });
+        })
+        .catch(error => {
+          console.log('ServiceWorker registration failed: ', error);
+          speak("Offline features not available");
+        });
+    });
+  }
+  
+  // Initialize offline status on page load
+  if (!navigator.onLine) {
+    document.getElementById('offlineNotification').style.display = 'block';
+  }
+  
+  // ====================== dashboard.js ======================
+  // Fetch motion status every 5 seconds
+  function updateMotionStatus() {
+    fetch("/motion-status")
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById("motionStatus").textContent = data.motion;
+      })
+      .catch(err => console.error("Error fetching motion status:", err));
+  }
+
+  // Fetch analytics data every 5 seconds
+  function updateAnalytics() {
+    fetch("/analytics")  // Assuming Flask has an endpoint for this
+      .then(response => response.json())
+      .then(data => {
+        // Update analytics section
+        document.getElementById("analytics").innerHTML = `
+          <strong>Temperature:</strong> ${data.temperature} °C<br>
+          <strong>Humidity:</strong> ${data.humidity} %<br>
+          <strong>Other Metrics:</strong> ${data.otherMetrics}
+        `;
+      })
+      .catch(err => console.error("Error fetching analytics data:", err));
+  }
+
+  // Call these functions on load to initialize
+  function initializeDashboard() {
+    updateMotionStatus();  // Initial fetch for motion status
+    updateAnalytics();  // Initial fetch for analytics data
+
+    setInterval(updateMotionStatus, 5000);  // Update motion status every 5 seconds
+    setInterval(updateAnalytics, 5000);  // Update analytics every 5 seconds
+  }
+
+  // Call initializeDashboard when the page is loaded
+  window.addEventListener("DOMContentLoaded", initializeDashboard);
+  
+  // ====================== detection.js ======================
+  const detectionModes = {
+    home: [
+      "person", "dog", "cat", "tv", "remote", "refrigerator", "microwave",
+      "chair", "couch", "bed", "tree", "backpack", "cell phone", "umbrella"
+    ],
+    public: [
+      "person", "car", "bus", "bicycle", "motorcycle", "traffic light", "stop sign",
+      "bench", "truck", "tree", "backpack", "cell phone", "umbrella"
+    ]
+  };
+
+  const cocoLabels = [
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
+    "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
+    "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra",
+    "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
+    "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
+    "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
+    "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
+    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
+    "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
+    "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
+    "refrigerator", "book", "clock", "vase", "scissors", "teddy bear",
+    "hair drier", "toothbrush"
+  ];
+
+  let lastDetectionMessage = "";
+  let quietMode = false;
+  const socket = io(window.location.origin);
+
+  socket.on('speak', (data) => {
+    if (data.message && !quietMode) {
+      lastDetectionMessage = data.message;
+      speak(data.message);
+      const logList = document.getElementById("detectionList");
+      const newItem = document.createElement("li");
+      newItem.textContent = `${new Date().toLocaleTimeString()}: ${data.message}`;
+      const placeholder = document.getElementById("placeholder");
+      if (placeholder) placeholder.remove();
+      logList.prepend(newItem);
+      if (logList.children.length > 10) logList.removeChild(logList.lastChild);
+    }
+  });
+
+  function speakLastDetection() {
+    if (!quietMode && lastDetectionMessage) speak(lastDetectionMessage);
+    else if (!quietMode) speak("No detection has been received yet.");
+  }
+
+  function clearDetectionLog() {
+    document.getElementById("detectionList").innerHTML = "<li id='placeholder'>No detections yet.</li>";
+    lastDetectionMessage = "";
+    if (!quietMode) speak("Detection log cleared.");
+  }
+
+  function updateMode() {
+    const mode = document.getElementById("modeSelect").value;
+    document.getElementById("customLabelBox").style.display = mode === "custom" ? "block" : "none";
+    if (!quietMode) speak(mode === "home" ? "Home mode activated" : mode === "public" ? "Public mode activated" : "Custom mode activated");
+  }
+
+  function updateConfig() {
+    const mode = document.getElementById("modeSelect").value;
+    let selectedLabels = [];
+    if (mode === "custom") {
+      document.querySelectorAll("#customLabels input[type=checkbox]:checked").forEach(cb => {
+        selectedLabels.push(cb.value);
+      });
+      localStorage.setItem("custom_labels", JSON.stringify(selectedLabels));
+      fetch('/save_custom_labels', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ labels: selectedLabels })
+      });
+    } else {
+      selectedLabels = detectionModes[mode];
+    }
+    fetch('config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labels: selectedLabels })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!quietMode) speak(`Detection config updated for ${mode} mode.`);
+    })
+    .catch(err => {
+      if (!quietMode) speak("Failed to update detection config.");
+    });
+  }
+
+  function generateCustomLabelUI() {
+    const container = document.getElementById("customLabels");
+    container.innerHTML = "";
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "Search labels...";
+    searchInput.oninput = () => filterLabels(searchInput.value.toLowerCase());
+    container.appendChild(searchInput);
+
+    container.appendChild(document.createElement("br"));
+
+    const controls = document.createElement("div");
+    controls.innerHTML = `
+      <button onclick="selectAllLabels()">Select All</button>
+      <button onclick="deselectAllLabels()">Deselect All</button>
+      <br><br>
+    `;
+    container.appendChild(controls);
+
+    const groups = {
+      Indoor: ["tv", "remote", "chair", "couch", "bed", "sink", "microwave", "refrigerator", "laptop", "clock"],
+      Outdoor: ["car", "bus", "truck", "traffic light", "bench", "bicycle", "stop sign"],
+      Animals: ["dog", "cat", "cow", "horse", "zebra", "elephant", "bird", "sheep"]
+    };
+
+    const saved = JSON.parse(localStorage.getItem("custom_labels") || "[]");
+
+    for (const [group, labels] of Object.entries(groups)) {
+      const groupTitle = document.createElement("strong");
+      groupTitle.textContent = group;
+      container.appendChild(groupTitle);
+      container.appendChild(document.createElement("br"));
+
+      labels.forEach(label => {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = label;
+        cb.id = `label_${label}`;
+        cb.checked = saved.includes(label);
+
+        const lbl = document.createElement("label");
+        lbl.htmlFor = cb.id;
+        lbl.textContent = label;
+
+        container.appendChild(cb);
+        container.appendChild(lbl);
+        container.appendChild(document.createElement("br"));
+      });
+      container.appendChild(document.createElement("br"));
+    }
+  }
+
+  function filterLabels(query) {
+    document.querySelectorAll("#customLabels label").forEach(label => {
+      const checkbox = document.getElementById(label.htmlFor);
+      const match = label.textContent.toLowerCase().includes(query);
+      label.style.display = match ? "inline" : "none";
+      checkbox.style.display = match ? "inline" : "none";
+    });
+  }
+
+  function selectAllLabels() {
+    document.querySelectorAll("#customLabels input[type=checkbox]").forEach(cb => cb.checked = true);
+  }
+
+  function deselectAllLabels() {
+    document.querySelectorAll("#customLabels input[type=checkbox]").forEach(cb => cb.checked = false);
+  }
+
+  function updateStatusPanel() {
+    fetch('/get_config')
+      .then(res => res.json())
+      .then(data => {
+        const modeText = data.indoor_mode ? '🏠 Home' :
+                         data.custom_mode ? '🧩 Custom' : '🌆 Public';
+        document.getElementById("modeLabel").textContent = modeText;
+        document.getElementById("activeLabels").textContent = (data.filter_classes || []).join(", ");
+        document.getElementById("toggleDetection").checked = data.detection_active;
+        document.getElementById("toggleVoice").checked = data.voice_alert_enabled;
+      });
+  }
+
+  document.getElementById("toggleDetection").addEventListener("change", (e) => {
+    fetch("/update_config", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ detection_active: e.target.checked })
+    });
+  });
+
+  document.getElementById("toggleVoice").addEventListener("change", (e) => {
+    fetch("/update_config", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voice_alert_enabled: e.target.checked })
+    });
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    updateMode();
+    generateCustomLabelUI();
+    fetch("/status")
+      .then(res => res.json())
+      .then(data => { quietMode = !!data.quiet_mode_enabled });
+    updateStatusPanel();
+  });
+  
+  // ====================== navigation.js ======================
+  let map, directionsService, directionsRenderer, userLocation, watchId;
+  let routeSteps = [], currentStepIndex = 0, pathLine;
+  let trackingPaused = false;
+  const proximityThreshold = 25;
+  const rerouteThreshold = 50; // meters off path triggers reroute
+  const pathHistory = [];
+
+  let arrowMarker = null;
+  let blueDot = null;
+  let lastPoint = null;
+
+  // 🔊 Send voice message to Flask server (to be spoken on phone)
+  function pushMessageToFlask(message) {
+    if (!Speech?.quiet) {
+      fetch("/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+    }
+  }
+
+  function initMap() {
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const coords = pos.coords;
+      userLocation = {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        speed: coords.speed || 0
+      };
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: userLocation,
+        zoom: 18,
+        mapTypeId: "roadmap",
+        rotateControl: true,
+        disableDefaultUI: true,
+        gestureHandling: "greedy"
+      });
+      directionsService = new google.maps.DirectionsService();
+      directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: true });
+
+      pushMessageToFlask("Map ready. Please search a destination or use voice.");
+    }, () => {
+      pushMessageToFlask("Unable to access location.");
+    }, {
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 0
+    });
+  }
+
+  function startVoiceSearch() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = function (event) {
+      const voiceText = event.results[0][0].transcript.toLowerCase().trim();
+      console.log("🎤 Heard:", voiceText);
+
+      if (voiceText.includes("where am i")) {
+        speakDetailedLocation();
+        return;
+      }
+
+      const pattern = /(?:go to|navigate to|find|search for|take me to|get directions to|head to)?\s*(.*)$/;
+      const match = voiceText.match(pattern);
+      let destination = match && match[1] ? match[1].trim() : "";
+
+      if (destination && destination.length > 2) {
+        document.getElementById("destinationInput").value = destination;
+        pushMessageToFlask(`Getting directions to ${destination}`);
+        routeTo(destination);
+      } else {
+        pushMessageToFlask("Say something like 'navigate to library' or 'where am I'.");
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Voice recognition error:", event.error);
+      pushMessageToFlask("Sorry, I didn't catch that.");
+    };
+
+    recognition.start();
+  }
+
+  function speakDetailedLocation() {
+    if (!navigator.geolocation) return pushMessageToFlask("Geolocation not supported.");
+
+    navigator.geolocation.getCurrentPosition((position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const geocoder = new google.maps.Geocoder();
+      const latLng = new google.maps.LatLng(lat, lng);
+
+      geocoder.geocode({ location: latLng }, (results, status) => {
+        if (status === "OK" && results[0]) {
+          pushMessageToFlask(`You are at ${results[0].formatted_address}`);
+        } else {
+          pushMessageToFlask(`Latitude ${lat}, Longitude ${lng}.`);
+        }
+      });
+    }, () => pushMessageToFlask("Unable to get your current location."));
+  }
+
+  function routeTo(place) {
+    if (!map || !directionsService || !directionsRenderer || !userLocation) {
+      pushMessageToFlask("Navigation not ready.");
+      return;
+    }
+
+    const service = new google.maps.places.PlacesService(map);
+    service.findPlaceFromQuery({ query: place, fields: ["geometry", "name"] }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+        const location = results[0].geometry.location;
+        const request = {
+          origin: userLocation,
+          destination: location,
+          travelMode: google.maps.TravelMode.WALKING
+        };
+
+        directionsService.route(request, (result, status) => {
+          if (status === "OK") {
+            directionsRenderer.setDirections(result);
+            routeSteps = result.routes[0].legs[0].steps;
+            currentStepIndex = 0;
+            pathLine = new google.maps.Polyline({ path: [], map, strokeColor: '#00ffc8' });
+            startLiveTracking();
+          } else {
+            fallbackGeocode(place);
+          }
+        });
+      } else {
+        fallbackGeocode(place);
+      }
+    });
+  }
+
+  function fallbackGeocode(place) {
+    pushMessageToFlask("Couldn't get route. Showing location on map.");
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ address: place }, (res, status) => {
+      if (status === "OK" && res[0]) {
+        map.setCenter(res[0].geometry.location);
+        new google.maps.Marker({ map, position: res[0].geometry.location });
+      } else {
+        pushMessageToFlask("Still couldn’t find that location.");
+      }
+    });
+  }
+
+  function startLiveTracking() {
+    if (!navigator.geolocation) return pushMessageToFlask("Geolocation not supported.");
+
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition((pos) => {
+      if (trackingPaused) return;
+
+      const coords = pos.coords;
+      const heading = coords.heading || 0;
+      const newPos = {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        speed: coords.speed || 0
+      };
+      userLocation = newPos;
+
+      map.setCenter(newPos);
+      map.setZoom(18);
+      map.setHeading(heading);
+
+      if (!blueDot) {
+        blueDot = new google.maps.Marker({
+          position: newPos,
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: '#4285F4',
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: 'white'
+          }
+        });
+      } else {
+        blueDot.setPosition(newPos);
+      }
+
+      if (!arrowMarker) {
+        arrowMarker = new google.maps.Marker({
+          position: newPos,
+          map,
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 5,
+            strokeColor: "#00ffc8",
+            fillOpacity: 1,
+            rotation: heading
+          }
+        });
+      } else {
+        arrowMarker.setPosition(newPos);
+        arrowMarker.setIcon({ ...arrowMarker.getIcon(), rotation: heading });
+      }
+
+      const path = pathLine.getPath();
+      path.push(newPos);
+      pathHistory.push(newPos);
+      savePathToFirebase(newPos);
+
+      if (routeSteps.length && currentStepIndex < routeSteps.length) {
+        const step = routeSteps[currentStepIndex];
+        const userLatLng = new google.maps.LatLng(newPos.lat, newPos.lng);
+        const stepStart = new google.maps.LatLng(step.start_location.lat(), step.start_location.lng());
+
+        const dist = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, stepStart);
+
+        if (dist < proximityThreshold || dist < 50) {
+          let instruction = step.instructions.replace(/<[^>]+>/g, '').toLowerCase();
+
+          if (instruction.startsWith("head ")) instruction = "Go forward";
+          else if (instruction.includes("turn left")) instruction = "Turn left";
+          else if (instruction.includes("turn right")) instruction = "Turn right";
+          else if (instruction.includes("continue")) instruction = "Keep walking straight";
+          else if (instruction.includes("your destination")) instruction = "You have reached your destination";
+          else instruction = instruction.charAt(0).toUpperCase() + instruction.slice(1);
+
+          pushMessageToFlask(instruction);
+          currentStepIndex++;
+        } else if (dist > rerouteThreshold) {
+          pushMessageToFlask("You are off route. Recalculating.");
+          routeTo(document.getElementById("destinationInput").value);
+        }
+      }
+    }, () => pushMessageToFlask("Unable to track your location."), {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 10000
+    });
+  }
+
+  function toggleTracking() {
+    trackingPaused = !trackingPaused;
+    pushMessageToFlask(trackingPaused ? "Navigation paused." : "Navigation resumed.");
+  }
+
+  function savePathToFirebase(pos) {
+    const now = Date.now();
+    let speed = pos.speed || 0;
+    let distance = 0;
+
+    if (lastPoint) {
+      const R = 6371000;
+      const toRad = (x) => x * Math.PI / 180;
+      const dLat = toRad(pos.lat - lastPoint.lat);
+      const dLng = toRad(pos.lng - lastPoint.lng);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lastPoint.lat)) * Math.cos(toRad(pos.lat)) *
+                Math.sin(dLng / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      distance = R * c;
+    }
+
+    lastPoint = { ...pos };
+
+    fetch('/log_location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat: pos.lat,
+        lng: pos.lng,
+        timestamp: now,
+        speed: speed * 3.6,
+        distance: Math.round(distance)
+      })
+    });
+  }
+  
+  // ====================== sensor.js ======================
+  function applyThresholds() {
+    const thresholds = {
+      "Left Front": parseInt(document.getElementById("Left Front").value),
+      "Left Middle": parseInt(document.getElementById("Left Middle").value),
+      "Left Rear": parseInt(document.getElementById("Left Rear").value),
+      "Right Front": parseInt(document.getElementById("Right Front").value),
+      "Right Middle": parseInt(document.getElementById("Right Middle").value),
+      "Right Rear": parseInt(document.getElementById("Right Rear").value),
+    };
+
+    fetch("/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ultrasonic_thresholds: thresholds })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!Speech?.quiet) speak("Thresholds updated successfully");
+      })
+      .catch(err => {
+        console.error("Failed to update thresholds:", err);
+        if (!Speech?.quiet) speak("Failed to update thresholds");
+      });
+  }
+
+  function toggleFullScreen(el) {
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
+  
+  // ====================== speech.js ======================
+  const Speech = {
+    synth: window.speechSynthesis,
+    queue: [],
+    speaking: false,
+    muted: false,
+    pitch: 1,
+    rate: 1,
+    voicePref: 'female',
+    ready: false,
+    quiet: false,
+
+    init() {
+      this.loadVoices(() => {
+        this.ready = true;
+        this.log("Speech system ready");
+        this.populateVoiceSelector();
+      });
+
+      // Fetch quiet mode status on init
+      fetch("/status")
+        .then(res => res.json())
+        .then(data => {
+          this.quiet = !!data.quiet_mode_enabled;
+        });
+    },
+
+    loadVoices(callback) {
+      let voices = this.synth.getVoices();
+      if (voices.length !== 0) {
+        callback();
+      } else {
+        this.synth.onvoiceschanged = () => {
+          voices = this.synth.getVoices();
+          callback();
+        };
+      }
+    },
+
+    getVoice() {
+      const voices = this.synth.getVoices();
+      const selected = document.getElementById('voiceSelector')?.value || 'female';
+      const match = voices.find(v =>
+        selected === 'female'
+          ? /(female|zira|samantha|karen)/i.test(v.name)
+          : /(male|david|daniel|fred|george)/i.test(v.name)
+      );
+      this.log(`[Voice Picked] ${match?.name || voices[0]?.name}`);
+      return match || voices[0];
+    },
+
+    speak(msg, options = {}) {
+      if (this.muted || this.quiet || !msg || !this.ready) return;
+
+      const utter = new SpeechSynthesisUtterance(msg);
+      utter.pitch = options.pitch || this.pitch;
+      utter.rate = options.rate || this.rate;
+      utter.voice = this.getVoice();
+
+      utter.onend = () => {
+        this.speaking = false;
+        this.processQueue();
+      };
+
+      this.queue.push(utter);
+      this.processQueue();
+    },
+
+    processQueue() {
+      if (this.speaking || this.queue.length === 0) return;
+      this.speaking = true;
+      const next = this.queue.shift();
+      this.synth.speak(next);
+    },
+
+    mute(toggle) {
+      this.muted = toggle;
+      if (toggle) this.synth.cancel();
+    },
+
+    log(msg) {
+      console.log('[Speech]', msg);
+    },
+
+    populateVoiceSelector() {
+      const selector = document.getElementById('voiceSelector');
+      if (!selector) return;
+
+      selector.addEventListener('change', () => {
+        this.voicePref = selector.value;
+        this.log(`Voice preference changed to: ${this.voicePref}`);
+        pushMessageToFlask(`Switched to ${this.voicePref} voice`);
+      });
+    }
+  };
+
+  // 🔊 Global speak function
+  function speak(msg, options) {
+    Speech.speak(msg, options);
+  }
+
+  // 🔇 Mute checkbox
+  function toggleMute() {
+    const toggle = document.getElementById('muteToggle');
+    Speech.mute(toggle.checked);
+  }
+
+  // 🔊 Prevent duplicate messages within 1 second
+  let lastSpokenMessage = "";
+  let lastSpokenTime = 0;
+
+  // 🧠 On load + setup SocketIO voice listener
+  window.addEventListener('DOMContentLoaded', () => {
+    Speech.init();
+
+    document.body.addEventListener('click', () => {
+      if (!Speech.ready && !Speech.speaking) {
+        speak("Smart Hat ready");
+      }
+    }, { once: true });
+
+    const socket = io();
+    socket.on('connect', () => console.log("[SocketIO] Connected"));
+
+    socket.on('speak', (data) => {
+      if (!Speech.muted && !Speech.quiet && data?.message) {
+        const now = Date.now();
+        if (data.message === lastSpokenMessage && now - lastSpokenTime < 1000) {
+          console.log("[Speech] Duplicate message skipped:", data.message);
+          return;
+        }
+        lastSpokenMessage = data.message;
+        lastSpokenTime = now;
+        console.log("[SocketIO] Speaking:", data.message);
+        speak(data.message);
+      }
+    });
+  });
+  
+  // ====================== system.js ======================
+  let wakeListening = false;
+  let wakeWordEnabled = true;
+
+  function toggleIndoorMode() {
+    const enabled = document.getElementById("indoorToggle").checked;
+    fetch("/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ indoor_mode: enabled })
+    })
+      .then(res => res.json())
+      .then(() => {
+        speak(enabled ? "Indoor mode enabled" : "Indoor mode disabled");
+      });
+  }
+
+  function toggleQuietMode() {
+    const enabled = document.getElementById("quietToggle").checked;
+    fetch("/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quiet_mode_enabled: enabled })
+    })
+      .then(res => res.json())
+      .then(() => {
+        speak(enabled ? "Quiet mode enabled" : "Quiet mode disabled");
+      });
+  }
+
+  function toggleWakeWord() {
+    wakeWordEnabled = document.getElementById("wakeToggle").checked;
+    if (wakeWordEnabled && !wakeListening) {
+      wakeRecognizer.start();
+      wakeListening = true;
+      speak("Wake word enabled");
+    } else if (!wakeWordEnabled && wakeListening) {
+      wakeRecognizer.stop();
+      wakeListening = false;
+      speak("Wake word disabled");
+    }
+  }
+
+  function checkStatus() {
+    fetch("/status")
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("deviceName").textContent = navigator.userAgent;
+        document.getElementById("currentMode").textContent = data.mode || "--";
+        document.getElementById("quietStatus").textContent = data.quiet_mode_enabled ? "ON" : "OFF";
+        document.getElementById("quietToggle").checked = !!data.quiet_mode_enabled;
+        document.getElementById("wakeToggle").checked = wakeWordEnabled;
+        speak(`Battery at ${data.battery} percent. Mode is ${data.mode}. Quiet mode is ${data.quiet_mode_enabled ? 'on' : 'off'}. Health status is ${data.health}`);
+      });
+  }
+
+  function toggleLog() {
+    const log = document.getElementById("log");
+    log.style.display = log.style.display === "none" ? "block" : "none";
+    if (log.style.display === "block") {
+      log.textContent = "Loading...";
+      fetch("/status")
+        .then(res => res.json())
+        .then(data => {
+          log.innerHTML = `<strong>Status:</strong><br>Battery: ${data.battery}%<br>Health: ${data.health}`;
+        });
+    }
+  }
+
+  function deleteLogs() {
+    const logs = [
+      { key: "battery_logs", label: "Battery Logs" },
+      { key: "motion_logs", label: "Motion Logs" },
+      { key: "detection_logs", label: "Detection Logs" },
+      { key: "location_logs", label: "Location Logs" },
+      { key: "system_health_logs", label: "System Health Logs" },
+      { key: "video_logs", label: "Video Logs" }
+    ];
+
+    const selected = prompt("🧹 Which logs do you want to delete?\nOptions:\n- all\n- battery, ultrasonic, detection...\n\n(Type comma-separated keys or 'all')");
+
+    if (!selected) return speak("Log deletion cancelled.");
+    const keys = selected.trim().toLowerCase() === "all"
+      ? logs.map(l => l.key)
+      : selected.split(",").map(k => k.trim());
+
+    fetch("/delete_logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys })
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "success") {
+          const deleted = logs.filter(l => keys.includes(l.key)).map(l => l.label).join(", ");
+          speak(`Deleted logs: ${deleted}`);
+        } else {
+          speak(`Failed to delete logs. ${res.message}`);
+        }
+      })
+      .catch(() => speak("Error while deleting logs"));
+  }
+
+  const sectionNames = {
+    dashboard: "Dashboard",
+    nav: "Navigation Mode",
+    detect: "Detection Panel",
+    sensor: "Sensor Settings",
+    system: "System Tools",
+    voice: "Voice Commands"
+  };
+
+  function switchSection(id, el = null) {
+    document.querySelectorAll(".section").forEach(sec => sec.classList.remove("active"));
+    const target = document.getElementById(id);
+    if (target) target.classList.add("active");
+
+    document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+    if (el) el.classList.add("active");
+
+    const label = sectionNames[id] || id;
+    speak(`${label} activated`);
+  }
+
+  let wakeRecognizer = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  wakeRecognizer.continuous = true;
+  wakeRecognizer.interimResults = false;
+  wakeRecognizer.lang = "en-US";
+
+  wakeRecognizer.onresult = function (event) {
+    const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+    if (wakeWordEnabled && (transcript.includes("hat") || transcript.includes("smart hat"))) {
+      speak("Yes? Listening now.");
+      recognition.start();
+    }
+  };
+
+  wakeRecognizer.onerror = function (event) {
+    console.error("Wake recognizer error:", event.error);
+  };
+
+  function startWakeWordListener() {
+    if (wakeWordEnabled && !wakeListening) {
+      wakeRecognizer.start();
+      wakeListening = true;
+      console.log("Wake word listener activated");
+    }
+  }
+
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  function startListening() {
+    speak("Listening. Please say a command.");
+    recognition.start();
+  }
+
+  recognition.onresult = function (event) {
+    const transcript = event.results[0][0].transcript.toLowerCase().trim();
+    console.log("🎤 Heard:", transcript);
+    handleVoiceCommand(transcript);
+  };
+
+  recognition.onerror = function (event) {
+    console.error("Speech recognition error:", event.error);
+    speak("Sorry, I didn't catch that.");
+  };
+
+  function shutdownPi() {
+    console.log("Shutdown function triggered...");
+    fetch("/shutdown", { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        console.log("Shutdown response:", data);
+        speak(data.message);
+      })
+      .catch(err => {
+        console.error("Shutdown error:", err);
+        speak("Shutdown failed");
+      });
+  }
+
+  const voiceCommands = {
+    "dashboard": () => switchSection("dashboard"),
+    "open dashboard": () => switchSection("dashboard"),
+    "navigation": () => switchSection("nav"),
+    "open navigation": () => switchSection("nav"),
+    "detection": () => switchSection("detect"),
+    "open detection": () => switchSection("detect"),
+    "sensor": () => switchSection("sensor"),
+    "open sensors": () => switchSection("sensor"),
+    "system": () => switchSection("system"),
+    "open system": () => switchSection("system"),
+    "voice": () => switchSection("voice"),
+    "voice commands": () => switchSection("voice"),
+    "check battery": () => checkStatus(),
+    "enable indoor mode": () => { document.getElementById("indoorToggle").checked = true; toggleIndoorMode(); },
+    "disable indoor mode": () => { document.getElementById("indoorToggle").checked = false; toggleIndoorMode(); },
+    "enable quiet mode": () => { document.getElementById("quietToggle").checked = true; toggleQuietMode(); },
+    "disable quiet mode": () => { document.getElementById("quietToggle").checked = false; toggleQuietMode(); },
+    "enable wake word": () => { document.getElementById("wakeToggle").checked = true; toggleWakeWord(); },
+    "disable wake word": () => { document.getElementById("wakeToggle").checked = false; toggleWakeWord(); },
+    "shut down": () => { shutdownPi(); speak("Shutting down the system"); },
+    "delete logs": () => deleteLogs(),
+    "repeat detection": () => speakLastDetection(),
+    "repeat message": () => speak(lastSpokenMessage),
+    "where am i": () => speakDetailedLocation(),
+    "get location": () => speakDetailedLocation(),
+    "start voice navigation": () => startVoiceSearch(),
+    "navigate to": () => startVoiceSearch(),
+    "pause navigation": () => { toggleTracking(); speak("Navigation paused"); },
+    "resume navigation": () => { toggleTracking(); speak("Navigation resumed"); },
+    "install app": () => installPWA(),
+    "install the app": () => installPWA()
+  };
+
+  function refreshWifiStatus() {
+      fetch('/wifi_status')
+          .then(response => response.json())
+          .then(data => {
+              document.getElementById('wifi-ssid').textContent = data.ssid;
+              document.getElementById('wifi-signal').textContent = data.signal;
+              document.getElementById('wifi-ip').textContent = data.ip;
+          })
+          .catch(error => {
+              console.error("Failed to fetch Wi-Fi status:", error);
+          });
+  }
+
+  // Auto refresh on load
+  window.addEventListener('load', refreshWifiStatus);
+
+
+  function handleVoiceCommand(transcript) {
+    for (const phrase in voiceCommands) {
+      if (transcript.includes(phrase)) {
+        voiceCommands[phrase]();
+        return;
+      }
+    }
+    speak("Sorry, I didn't understand that command.");
+  }
+
+  // Start wake word listening on load
+  window.addEventListener("DOMContentLoaded", startWakeWordListener);
+  
+  // Security check on page load
+  window.addEventListener('load', () => {
+    if (location.protocol !== 'https:') {
+      document.getElementById('security-connection').textContent = 'Insecure 🔓';
+      document.getElementById('security-connection').style.color = '#ff5555';
+      speak("Warning: You are not using a secure connection");
+    }
+  });
+  </script>
+</body>
+</html>
